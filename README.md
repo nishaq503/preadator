@@ -1,4 +1,4 @@
-# Preadator Utility
+# Preadator Utility (v0.2.0)
 
 Streamlined management of threads and processes for algorithm scaling.
 
