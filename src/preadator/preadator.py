@@ -1,4 +1,4 @@
-"""preadator: the pure python process and thread manager"""
+"""preadator: the pure python process and thread manager."""
 import atexit
 import logging
 import multiprocessing
