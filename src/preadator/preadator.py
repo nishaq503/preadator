@@ -10,6 +10,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError
 from concurrent.futures import wait
+from typing import Union
 
 DEBUG = os.getenv("PREADATOR_DEBUG", "False").lower() in ("true", "1", "t")
 
@@ -93,7 +94,7 @@ def destroy_executors():
 class QueueLock:
     _name = "Queue"
 
-    def __init__(self, queue: multiprocessing.Queue | queue.Queue) -> None:
+    def __init__(self, queue: Union[multiprocessing.Queue, queue.Queue]) -> None:
         self.queue = queue
         self.thread_count = 0
 
