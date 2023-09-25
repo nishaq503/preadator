@@ -5,11 +5,8 @@ import logging
 import multiprocessing
 import os
 import queue
-import typing
 
 from . import locks
-
-DEBUG = os.getenv("PREADATOR_DEBUG", "False").lower() in ("true", "1", "t")
 
 class ProcessManager(concurrent.futures.Executor):
 
@@ -54,10 +51,13 @@ class ProcessManager(concurrent.futures.Executor):
             cls.unique_manager = super().__new__(cls)
         return cls.unique_manager
 
-    def _initializer(self, initargs) -> None:
+    def _initializer(self, initargs: dict) -> None:
         """Initializes the process."""
         for k, v in initargs.items():
-            setattr(self, k, v)
+            if hasattr(self, k):
+                setattr(self, k, v)
+            else:
+                raise ValueError(f"Invalid initializer argument: {k}={v}")
 
         self.job_name = self.process_names.get(timeout=0)
         self.job_logger = logging.getLogger(self.job_name)
