@@ -25,6 +25,8 @@ pytest-xdist = "^3.3.1"
 pytest-sugar = "^0.9.7"
 pytest-benchmark = "^4.0.0"
 pytest-cov = "^4.1.0"
+numpy = "^1.26.0"
+bfio = {version = "^2.3.1", extras = ["all"]}
 
 [build-system]
 requires = ["poetry-core"]
