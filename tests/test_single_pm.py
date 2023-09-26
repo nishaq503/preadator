@@ -20,12 +20,13 @@ def gen_images(name: str, size: int) -> tuple[pathlib.Path, pathlib.Path]:
     input_dir.mkdir(exist_ok=True)
     input_path = input_dir.joinpath(name)
 
-    # Generate a random image
-    utils.make_random_image(
-        path=input_path,
-        rng=numpy.random.default_rng(42),
-        size=size,
-    )
+    # Generate an image of zeros
+    with bfio.BioWriter(input_path) as writer:
+        writer.X = size
+        writer.Y = size
+        writer.dtype = numpy.uint32
+
+        writer[:] = numpy.zeros((size, size), dtype=writer.dtype)
 
     output_dir = data_dir.joinpath("outputs")
     output_dir.mkdir(exist_ok=True)
@@ -39,19 +40,16 @@ def test_serial_process() -> None:
     input_path, output_path = gen_images("test_serial.ome.tif", utils.TILE_SIZE * 2)
 
     with preadator.ProcessManager(
-        name="test_serial",
+        name="test_serial_process",
         log_level="INFO",
         num_processes=1,
         threads_per_process=1,
         threads_per_request=1,
-    ) as pm, bfio.BioReader(input_path, max_workers=1) as reader:
-        input_shape = (reader.Y, reader.X)
+    ) as pm:
+        futures = []
 
-        with bfio.BioWriter(
-            output_path,
-            max_workers=1,
-            metadata=reader.metadata,
-        ) as writer:
+        with bfio.BioReader(input_path, max_workers=1) as reader:
+            input_shape = (reader.Y, reader.X)
             for y_min in (0, reader.Y, utils.TILE_SIZE):
                 y_max = min(y_min + utils.TILE_SIZE, reader.Y)
 
@@ -59,8 +57,24 @@ def test_serial_process() -> None:
                     x_max = min(x_min + utils.TILE_SIZE, reader.X)
 
                     tile = reader[y_min:y_max, x_min:x_max]
-                    pm.submit_process(utils.add_one, tile)
-                    writer[y_min:y_max, x_min:x_max] = tile
+                    futures.append(pm.submit_process(utils.add_one, tile))
+
+            pm.join_processes()
+
+            with bfio.BioWriter(
+                output_path,
+                max_workers=1,
+                metadata=reader.metadata,
+            ) as writer:
+                for y_min in (0, reader.Y, utils.TILE_SIZE):
+                    y_max = min(y_min + utils.TILE_SIZE, reader.Y)
+
+                    for x_min in (0, reader.X, utils.TILE_SIZE):
+                        x_max = min(x_min + utils.TILE_SIZE, reader.X)
+
+                        tile = futures[0].result()
+                        futures = futures[1:]
+                        writer[y_min:y_max, x_min:x_max] = tile
 
     assert output_path.exists(), "Output file does not exist."
 
@@ -68,6 +82,9 @@ def test_serial_process() -> None:
         output_shape = (reader.Y, reader.X)
 
         assert input_shape == output_shape, "Input and output shapes do not match."
+
+        image = reader[:]
+        assert numpy.all(image == 1), "Not all pixels were incremented by 1."
 
     shutil.rmtree(input_path.parent.parent)
 
@@ -77,19 +94,16 @@ def test_serial_thread() -> None:
     input_path, output_path = gen_images("test_serial.ome.tif", utils.TILE_SIZE * 2)
 
     with preadator.ProcessManager(
-        name="test_serial",
+        name="test_serial_thread",
         log_level="INFO",
         num_processes=1,
         threads_per_process=1,
         threads_per_request=1,
-    ) as pm, bfio.BioReader(input_path, max_workers=1) as reader:
-        input_shape = (reader.Y, reader.X)
+    ) as pm:
+        futures = []
 
-        with bfio.BioWriter(
-            output_path,
-            max_workers=1,
-            metadata=reader.metadata,
-        ) as writer:
+        with bfio.BioReader(input_path, max_workers=1) as reader:
+            input_shape = (reader.Y, reader.X)
             for y_min in (0, reader.Y, utils.TILE_SIZE):
                 y_max = min(y_min + utils.TILE_SIZE, reader.Y)
 
@@ -97,8 +111,24 @@ def test_serial_thread() -> None:
                     x_max = min(x_min + utils.TILE_SIZE, reader.X)
 
                     tile = reader[y_min:y_max, x_min:x_max]
-                    pm.submit_thread(utils.add_one, tile)
-                    writer[y_min:y_max, x_min:x_max] = tile
+                    futures.append(pm.submit_thread(utils.add_one, tile))
+
+            pm.join_processes()
+
+            with bfio.BioWriter(
+                output_path,
+                max_workers=1,
+                metadata=reader.metadata,
+            ) as writer:
+                for y_min in (0, reader.Y, utils.TILE_SIZE):
+                    y_max = min(y_min + utils.TILE_SIZE, reader.Y)
+
+                    for x_min in (0, reader.X, utils.TILE_SIZE):
+                        x_max = min(x_min + utils.TILE_SIZE, reader.X)
+
+                        tile = futures[0].result()
+                        futures = futures[1:]
+                        writer[y_min:y_max, x_min:x_max] = tile
 
     assert output_path.exists(), "Output file does not exist."
 
@@ -106,5 +136,8 @@ def test_serial_thread() -> None:
         output_shape = (reader.Y, reader.X)
 
         assert input_shape == output_shape, "Input and output shapes do not match."
+
+        image = reader[:]
+        assert numpy.all(image == 1), "Not all pixels were incremented by 1."
 
     shutil.rmtree(input_path.parent.parent)

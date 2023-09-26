@@ -28,6 +28,6 @@ def make_random_image(
         writer[:] = rng.integers(2**8, 2**16, size=(size, size), dtype=writer.dtype)
 
 
-def add_one(tile: numpy.ndarray) -> None:
+def add_one(tile: numpy.ndarray) -> numpy.ndarray:
     """Add one to every pixel in the tile."""
-    tile += 1
+    return tile + 1
