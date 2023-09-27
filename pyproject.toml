@@ -26,7 +26,7 @@ pytest-sugar = "^0.9.7"
 pytest-benchmark = "^4.0.0"
 pytest-cov = "^4.1.0"
 numpy = "^1.26.0"
-bfio = {version = "^2.3.1", extras = ["all"]}
+bfio = { version = "2.1.9", extras = ["all"] }
 
 [build-system]
 requires = ["poetry-core"]
