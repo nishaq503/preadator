@@ -163,3 +163,4 @@ cython_debug/
 # Local files and folders
 ################################################################################
 /src/old_preadator
+/.vscode

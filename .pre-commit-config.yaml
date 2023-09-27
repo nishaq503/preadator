@@ -34,24 +34,13 @@ repos:
         language_version: python3.9
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    # Ruff version.
     rev: 'v0.0.274'
     hooks:
       - id: ruff
-        exclude: |
-          (?x)(
-            test_[a-zA-Z0-9]+.py$|
-            bench_[a-zA-Z0-9]+.py$
-          )
         args: [--fix]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: 'v1.4.0'
     hooks:
       - id: mypy
-        exclude: |
-          (?x)(
-            test_[a-zA-Z0-9]+.py$|
-            bench_[a-zA-Z0-9]+.py$
-          )
         additional_dependencies: [types-requests==2.31.0.1]
