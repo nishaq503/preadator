@@ -1,15 +1,10 @@
 """Tests that exceptions are correctly caught and handled by Preadator."""
 
 import math
-import pathlib
-import re
 import typing
 
-
-class InvalidEmailError(Exception):
-    """Raised when an email address is invalid."""
-
-    pass
+import preadator
+import pytest
 
 
 def division(a: float, b: float) -> typing.Union[float, ZeroDivisionError]:
@@ -25,41 +20,93 @@ def division(a: float, b: float) -> typing.Union[float, ZeroDivisionError]:
         raise ZeroDivisionError(msg)
 
 
-def square_root(a: int) -> typing.Union[float, ValueError]:
+class NegativeSqrtError(ValueError):
+    """Raised when a negative number is encountered."""
+
+    pass
+
+
+def square_root(a: int) -> typing.Union[float, NegativeSqrtError]:
     """Returns the square root of a.
 
     Raises:
-        ValueError: If a is negative
+        NegativeNumberError: If a is negative
     """
     try:
         return math.sqrt(a)
     except ValueError:
         msg = "Square root of negative numbers is not allowed"
-        raise ValueError(msg)
+        raise NegativeSqrtError(msg)
 
 
-def delete_file(filename: str) -> typing.Union[None, FileNotFoundError]:
-    """Deletes a file.
+def prev_fib(a: int, b: int) -> int:
+    """Returns the previous Fibonacci number.
 
-    Raises:
-        FileNotFoundError: If the file does not exist
+    Args:
+        a: the current Fibonacci number
+        b: the previous Fibonacci number
     """
-    try:
-        pathlib.Path(filename).unlink()
-        return None
-    except FileNotFoundError:
-        msg = f"File {filename} not found"
-        raise FileNotFoundError(msg)
+    return a - b
 
 
-def validate_email(email: str) -> typing.Union[bool, InvalidEmailError]:
-    """Validates an email address.
+def test_division() -> None:
+    """Tests that division errors are correctly caught and handled by Preadator."""
+    assert division(1, 1) == 1
+    assert division(1, 2) == 0.5
 
-    Raises:
-        InvalidEmailError: If the email address is invalid
-    """
-    if re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        return True
+    with pytest.raises(ZeroDivisionError):
+        division(1, 0)
 
-    msg = "Invalid email address"
-    raise InvalidEmailError(msg)
+    with pytest.raises(  # noqa: PT012
+        ZeroDivisionError,
+    ), preadator.ProcessManager() as pm:
+        futures = []
+
+        a, b = 8, 5
+        futures.append(pm.submit_process(division, a, b))
+
+        a, b = b, prev_fib(a, b)  # 5, 3
+        futures.append(pm.submit_process(division, a, b))
+
+        a, b = b, prev_fib(a, b)  # 3, 2
+        futures.append(pm.submit_process(division, a, b))
+
+        a, b = b, prev_fib(a, b)  # 2, 1
+        futures.append(pm.submit_process(division, a, b))
+
+        a, b = b, prev_fib(a, b)  # 1, 1
+        futures.append(pm.submit_process(division, a, b))
+
+        a, b = b, prev_fib(a, b)  # 1, 0
+        futures.append(pm.submit_process(division, a, b))
+
+        pm.join_processes()
+
+
+def test_square_root() -> None:
+    """Tests that square root errors are correctly caught and handled by Preadator."""
+    assert square_root(1) == 1
+    assert square_root(4) == 2
+
+    with pytest.raises(NegativeSqrtError):
+        square_root(-1)
+
+    with pytest.raises(  # noqa: PT012
+        NegativeSqrtError,
+    ), preadator.ProcessManager() as pm:
+        futures = []
+
+        a, b = 8, 6
+        futures.append(pm.submit_process(square_root, a))
+        futures.append(pm.submit_process(square_root, b))
+
+        a, b = b, prev_fib(a, b)  # 6, 2
+        futures.append(pm.submit_process(square_root, b))
+
+        a, b = b, prev_fib(a, b)  # 2, 4
+        futures.append(pm.submit_process(square_root, b))
+
+        a, b = b, prev_fib(a, b)  # 4, -2
+        futures.append(pm.submit_process(square_root, b))
+
+        pm.join_processes()
