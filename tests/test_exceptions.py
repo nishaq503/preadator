@@ -27,6 +27,7 @@ class NegativeSqrtError(ValueError):
 
     pass
 
+
 def slow_square_root(a: int) -> typing.Union[float, NegativeSqrtError]:
     random_big_number = random.randint(1, 1000) * 100000
     for i in range(0,random_big_number):
@@ -37,6 +38,7 @@ def slow_square_root_that_releases_gil(a: int) -> typing.Union[float, NegativeSq
     random_delay = random.randint(1, 10) * 1000
     time.sleep(random_delay)
     return square_root(a)
+
 
 def square_root(a: int) -> typing.Union[float, NegativeSqrtError]:
     """Returns the square root of a.
@@ -123,6 +125,7 @@ def test_square_root() -> None:
 
         pm.join_processes()
 
+
 def test_slow_square_root() -> None:
     """Tests that square root errors are correctly caught and handled by Preadator."""
     assert square_root(1) == 1
@@ -150,6 +153,7 @@ def test_slow_square_root() -> None:
         futures.append(pm.submit_process(slow_square_root, b))
 
         pm.join_processes()
+
 
 def test_slow_square_root_that_releases_gil() -> None:
     """Tests that square root errors are correctly caught and handled by Preadator."""
