@@ -6,6 +6,8 @@ import typing
 import preadator
 import pytest
 
+import time
+import random
 
 def division(a: float, b: float) -> typing.Union[float, ZeroDivisionError]:
     """Returns the result of dividing a by b.
@@ -25,6 +27,16 @@ class NegativeSqrtError(ValueError):
 
     pass
 
+def slow_square_root(a: int) -> typing.Union[float, NegativeSqrtError]:
+    random_big_number = random.randint(1, 1000) * 100000
+    for i in range(0,random_big_number):
+        i =+ 1
+    return square_root(a)
+
+def slow_square_root_that_releases_gil(a: int) -> typing.Union[float, NegativeSqrtError]:
+    random_delay = random.randint(1, 10) * 1000
+    time.sleep(random_delay)
+    return square_root(a)
 
 def square_root(a: int) -> typing.Union[float, NegativeSqrtError]:
     """Returns the square root of a.
@@ -108,5 +120,61 @@ def test_square_root() -> None:
 
         a, b = b, prev_fib(a, b)  # 4, -2
         futures.append(pm.submit_process(square_root, b))
+
+        pm.join_processes()
+
+def test_slow_square_root() -> None:
+    """Tests that square root errors are correctly caught and handled by Preadator."""
+    assert square_root(1) == 1
+    assert square_root(4) == 2
+
+    with pytest.raises(NegativeSqrtError):
+        square_root(-1)
+
+    with pytest.raises(  # noqa: PT012
+        NegativeSqrtError,
+    ), preadator.ProcessManager() as pm:
+        futures = []
+
+        a, b = 8, 6
+        futures.append(pm.submit_process(slow_square_root, a))
+        futures.append(pm.submit_process(slow_square_root, b))
+
+        a, b = b, prev_fib(a, b)  # 6, 2
+        futures.append(pm.submit_process(slow_square_root, b))
+
+        a, b = b, prev_fib(a, b)  # 2, 4
+        futures.append(pm.submit_process(slow_square_root, b))
+
+        a, b = b, prev_fib(a, b)  # 4, -2
+        futures.append(pm.submit_process(slow_square_root, b))
+
+        pm.join_processes()
+
+def test_slow_square_root_that_releases_gil() -> None:
+    """Tests that square root errors are correctly caught and handled by Preadator."""
+    assert square_root(1) == 1
+    assert square_root(4) == 2
+
+    with pytest.raises(NegativeSqrtError):
+        square_root(-1)
+
+    with pytest.raises(  # noqa: PT012
+        NegativeSqrtError,
+    ), preadator.ProcessManager() as pm:
+        futures = []
+
+        a, b = 8, 6
+        futures.append(pm.submit_process(slow_square_root_that_releases_gil, a))
+        futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
+
+        a, b = b, prev_fib(a, b)  # 6, 2
+        futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
+
+        a, b = b, prev_fib(a, b)  # 2, 4
+        futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
+
+        a, b = b, prev_fib(a, b)  # 4, -2
+        futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
 
         pm.join_processes()
