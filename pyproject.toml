@@ -5,7 +5,7 @@ authors = [
     "Nicholas-Schaub <nick.schaub@nih.gov>",
     "Najib Ishaq <nahib.ishaq@nih.gov"
 ]
-version = "0.4.0-dev0"
+version = "0.4.0-dev1"
 repository = "https://github.com/nicholas-schaub/preadator"
 readme = "README.md"
 packages = [{include = "preadator", from = "src"}]

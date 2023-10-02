@@ -122,7 +122,7 @@ class ProcessManager(concurrent.futures.Executor):
         # Make sure that the ProcessManager is not already running.
         if self.running:
             msg = "ProcessManager is already running. Try shutting it down first."
-            raise RuntimeError(msg)
+            self.main_logger.warning(msg)
 
         # Change the name of the logger.
         if name is not None:
