@@ -1,4 +1,5 @@
+"""Process and Thread Management Utility."""
 
-from .preadator import ProcessManager
+from .process_manager import ProcessManager
 
-__version__ = "0.3.0-dev1"
+__version__ = "0.4.0-dev0"

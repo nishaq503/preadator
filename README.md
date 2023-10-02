@@ -1,4 +1,4 @@
-# Preadator Utility (v0.3.0-dev1)
+# Preadator Utility (v0.4.0-dev0)
 
 Streamlined management of threads and processes for algorithm scaling.
 
@@ -6,7 +6,7 @@ Supports Python>=3.9.
 
 # Bugs
 
-Preadator is designed to work in Python >= 3.7, but there is a 
+Preadator is designed to work in Python >= 3.7, but there is a
 [bug in Python](https://bugs.python.org/issue39098)
 in the `ProcessPoolExecutor` that causes an `OSError` with
 `.shutdown(wait=False)`.
