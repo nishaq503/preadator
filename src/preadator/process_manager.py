@@ -9,43 +9,23 @@ import queue
 import typing
 
 
+def unit(x: typing.Any) -> typing.Any:  # noqa: ANN401
+    """Returns the given argument."""
+    return x
+
+
 class ProcessManager(concurrent.futures.Executor):
     """Manages processes and threads.
 
     The ProcessManager class is a singleton class that manages processes and
     threads. It is a subclass of concurrent.futures.Executor and can be used
     as such. It is also a context manager and can be used as such.
-
-    Attributes:
-        unique_manager: The unique ProcessManager instance.
-        log_level: The logging level of the ProcessManager.
-        debug: Whether to print debug messages.
-        name: The name of the ProcessManager.
-        main_logger: The logger of the ProcessManager.
-        job_name: The name of the current process.
-        job_logger: The logger of the current process.
-        process_executor: The process pool executor.
-        processes: The list of processes' futures.
-        thread_executor: The thread pool executor.
-        threads: The list of threads' futures.
-        num_active_threads: The number of active threads.
-        num_available_cpus: The number of available CPUs.
-        num_processes: The maximum number of processes.
-        threads_per_process: The number of threads per process that can be run.
-        threads_per_request: The number of threads per request.
-        running: Whether the ProcessManager is running.
-        process_queue: The queue of processes.
-        process_names: The queue of process names.
-        process_ids: The queue of process IDs.
-        thread_queue: The queue of threads.
-        thread_names: The queue of thread names.
-        thread_ids: The queue of thread IDs.
     """
 
     unique_manager = None
 
     log_level = getattr(logging, os.environ.get("PREADATOR_LOG_LEVEL", "WARNING"))
-    debug = os.getenv("PREADATOR_DEBUG", "false").lower() in ("true", "1", "t")
+    debug = os.getenv("PREADATOR_DEBUG", "0").lower() == "1"
 
     name = "ProcessManager"
     main_logger = logging.getLogger(name)
@@ -61,7 +41,6 @@ class ProcessManager(concurrent.futures.Executor):
     threads = None
     num_active_threads = 0
 
-    # os.sched_getaffinity(0) is not available on MacOS and Windows.
     num_cpus: int = os.cpu_count()  # type: ignore[assignment]
     num_processes: int = max(1, num_cpus // 2)
     threads_per_process: int = num_cpus // num_processes
@@ -227,10 +206,14 @@ class ProcessManager(concurrent.futures.Executor):
         Returns:
             A Future representing the given call.
         """
-        self.processes.append(
-            self.process_executor.submit(fn, *args, **kwargs),  # type: ignore[union-attr]  # noqa: E501
-        )
-        return self.processes[-1]
+        if self.debug:
+            result = fn(*args, **kwargs)
+            f = self.process_executor.submit(unit, result)  # type: ignore[union-attr]
+        else:
+            f = self.process_executor.submit(fn, *args, **kwargs)  # type: ignore[union-attr]  # noqa: E501
+
+        self.processes.append(f)  # type: ignore[union-attr]
+        return f
 
     def submit_thread(
         self,
@@ -247,10 +230,13 @@ class ProcessManager(concurrent.futures.Executor):
         Returns:
             A Future representing the given call.
         """
-        self.threads.append(
-            self.thread_executor.submit(fn, *args, **kwargs),  # type: ignore[union-attr]  # noqa: E501
-        )
-        return self.threads[-1]
+        if self.debug:
+            result = fn(*args, **kwargs)
+            f = self.thread_executor.submit(unit, result)  # type: ignore[union-attr]
+        else:
+            f = self.thread_executor.submit(fn, *args, **kwargs)  # type: ignore[union-attr]  # noqa: E501
+        self.threads.append(f)  # type: ignore[union-attr]
+        return f
 
     def submit(
         self,
@@ -412,9 +398,14 @@ class ProcessManager(concurrent.futures.Executor):
 
         self.join_threads()
         self.join_processes()
-        self.running = False
-        self.thread_executor = None
-        self.process_executor = None
+        self.thread_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.num_cpus,
+        )
+        self.threads = []  # type: ignore[var-annotated]
+        self.process_executor = concurrent.futures.ProcessPoolExecutor(
+            max_workers=self.num_processes,
+        )
+        self.processes = []  # type: ignore[var-annotated]
 
         if len(errors) > 0:
             msg = (
