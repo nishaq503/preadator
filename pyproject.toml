@@ -2,7 +2,7 @@
 name = "preadator"
 description = "Process and Thread Management Utility."
 authors = [
-    "Nicholas-Schaub <nick.schaub@nih.gov>",
+    "Nicholas Schaub <nick.schaub@nih.gov>",
     "Najib Ishaq <nahib.ishaq@nih.gov"
 ]
 version = "0.4.0-dev2"
@@ -27,6 +27,9 @@ pytest-benchmark = "^4.0.0"
 pytest-cov = "^4.1.0"
 numpy = "^1.26.0"
 bfio = { version = "2.1.9", extras = ["all"] }
+mkdocs = "^1.5.3"
+mkdocstrings = { version = "^0.23.0", extras = ["python"] }
+mkdocs-material = "^9.4.4"
 
 [build-system]
 requires = ["poetry-core"]

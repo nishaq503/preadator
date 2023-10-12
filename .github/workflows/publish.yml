@@ -8,7 +8,7 @@ on:
       - dev
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tests:
@@ -25,6 +25,9 @@ jobs:
       - name: Dependencies
         run: |
           pip install --user poetry && poetry install
+      - name: Docs
+        run: |
+          poetry run mkdocs gh-deploy -cq --force
       - name: Publish
         env:
           PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}

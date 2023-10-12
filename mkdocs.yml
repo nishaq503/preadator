@@ -1,0 +1,20 @@
+# mkdocs.yml
+
+site_name: Preadator Docs
+
+theme:
+  name: material
+  palette:
+    primary: deep_orange
+    accent: deep_orange
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+plugins:
+  - mkdocstrings
+
+nav:
+  - Home: index.md
+  - About: about.md
+  - Contact: contact.md
