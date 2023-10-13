@@ -177,7 +177,7 @@ class ProcessManager(concurrent.futures.Executor):
 
     num_processes: int = max(1, num_available_cpus // 2)
     """The maximum number of processes.
-    
+
     This is set to half the number of available CPUs by default. This is because
     the number of processes is usually limited by the number of available CPUs
     and each process can run, for example, IO-bound tasks in different threads.
@@ -185,7 +185,7 @@ class ProcessManager(concurrent.futures.Executor):
 
     threads_per_process: int = num_available_cpus // num_processes
     """The number of threads per process that can be run.
-    
+
     This default is set so that the product of the number of processes and the
     number of threads per process is equal to the number of available CPUs.
     """
