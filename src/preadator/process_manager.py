@@ -128,10 +128,15 @@ class ProcessManager(concurrent.futures.Executor):
     debug = os.getenv("PREADATOR_DEBUG", "0").lower() == "1"
     """Whether to run in debug mode.
 
-    In debug mode, the ProcessManager will run all processes and threads in the
-    main process and thread. This is useful for debugging.
-
     This is controlled by the PREADATOR_DEBUG environment variable.
+
+    In debug mode, the ProcessManager will run all submitted jobs in the main
+    process and thread. It still returns the results using futures, as if they
+    were run in parallel, but it does not actually run them in parallel. This is
+    useful for debugging when, for example, you want to attach a debugger, or if
+    you want to find out whether a bug is caused by running code in parallel, or
+    because of dependencies between the processes/threads, or because of
+    something else.
     """
 
     name = "ProcessManager"
@@ -170,15 +175,20 @@ class ProcessManager(concurrent.futures.Executor):
 
     num_available_cpus = multiprocessing.cpu_count()
 
-    num_processes: int
-    """The maximum number of processes."""
+    num_processes: int = max(1, num_available_cpus // 2)
+    """The maximum number of processes.
+    
+    This is set to half the number of available CPUs by default. This is because
+    the number of processes is usually limited by the number of available CPUs
+    and each process can run, for example, IO-bound tasks in different threads.
+    """
 
-    num_processes = max(1, num_available_cpus // 2)
-
-    threads_per_process: int
-    """The number of threads per process that can be run."""
-
-    threads_per_process = num_available_cpus // num_processes
+    threads_per_process: int = num_available_cpus // num_processes
+    """The number of threads per process that can be run.
+    
+    This default is set so that the product of the number of processes and the
+    number of threads per process is equal to the number of available CPUs.
+    """
 
     _threads_per_request: int = threads_per_process
     """The number of threads per request.
