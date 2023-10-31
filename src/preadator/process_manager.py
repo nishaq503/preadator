@@ -340,6 +340,14 @@ class ProcessManager(concurrent.futures.Executor):
             f"Process {self._job_name} initialized with PID {os.getpid()}.",
         )
 
+    def acquire_process(self) -> "ProcessLock":
+        """Acquires a lock for the current process."""
+        return ProcessLock(self._process_queue)  # type: ignore[arg-type]
+
+    def acquire_thread(self) -> "ThreadLock":
+        """Acquires a lock for the current thread."""
+        return ThreadLock(self._thread_queue)  # type: ignore[arg-type]
+
     def submit_process(
         self,
         fn,  # noqa: ANN001
