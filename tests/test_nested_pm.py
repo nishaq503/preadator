@@ -8,6 +8,7 @@ import typing
 import bfio
 import numpy
 import preadator
+import pytest
 
 from . import utils
 
@@ -197,3 +198,34 @@ def test_nested_pm() -> None:
         assert numpy.all(reader[:] == 3), "The output image is incorrect."
 
     shutil.rmtree(data_dir)
+
+
+def fibonacci(n: int, method: typing.Literal["process", "thread"]) -> int:
+    """Get Fibonacci number, the recursive way."""
+    if n < 0:
+        msg = "fibonacci() not defined for negative values"
+        raise ValueError(msg)
+    if n < 2:
+        return n
+    with preadator.ProcessManager(
+        name=f"PM_Fibonacci({n})",
+        num_processes=4,
+        threads_per_process=2,
+    ) as pm:
+        if method == "thread":
+            f_1 = pm.submit_thread(fibonacci, n - 1, method)
+            f_2 = pm.submit_thread(fibonacci, n - 2, method)
+            pm.join_threads()
+        else:
+            assert method == "process"
+            f_1 = pm.submit_process(fibonacci, n - 1, method)
+            f_2 = pm.submit_process(fibonacci, n - 2, method)
+            pm.join_processes()
+        return f_1.result() + f_2.result()
+
+
+@pytest.mark.parametrize("n", [3, 4, 5, 6])
+@pytest.mark.parametrize("method", ["process", "thread"])
+def test_fibonacci(n: int, method: typing.Literal["process", "thread"]) -> None:
+    """Run a series of recursive tests to calculate Fibonacci numbers."""
+    fibonacci(n, method)
