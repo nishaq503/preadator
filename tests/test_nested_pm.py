@@ -81,7 +81,6 @@ def img_op(
         log_level="INFO",
         num_processes=2,
         threads_per_process=1,
-        threads_per_request=1,
     ) as pm:
         futures = []
 
@@ -159,7 +158,6 @@ def test_nested_pm() -> None:
         log_level="INFO",
         num_processes=4,
         threads_per_process=2,
-        threads_per_request=2,
     ) as pm:
         futures = []
 

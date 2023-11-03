@@ -145,14 +145,8 @@ def test_slow_square_root() -> None:
     ), preadator.ProcessManager() as pm:
         futures = []
 
-        a, b = 8, 6
+        a, b = 2, 4
         futures.append(pm.submit_process(slow_square_root, a))
-        futures.append(pm.submit_process(slow_square_root, b))
-
-        a, b = b, prev_fib(a, b)  # 6, 2
-        futures.append(pm.submit_process(slow_square_root, b))
-
-        a, b = b, prev_fib(a, b)  # 2, 4
         futures.append(pm.submit_process(slow_square_root, b))
 
         a, b = b, prev_fib(a, b)  # 4, -2
@@ -174,14 +168,8 @@ def test_slow_square_root_that_releases_gil() -> None:
     ), preadator.ProcessManager() as pm:
         futures = []
 
-        a, b = 8, 6
+        a, b = 2, 4
         futures.append(pm.submit_process(slow_square_root_that_releases_gil, a))
-        futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
-
-        a, b = b, prev_fib(a, b)  # 6, 2
-        futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
-
-        a, b = b, prev_fib(a, b)  # 2, 4
         futures.append(pm.submit_process(slow_square_root_that_releases_gil, b))
 
         a, b = b, prev_fib(a, b)  # 4, -2

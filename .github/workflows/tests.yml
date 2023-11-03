@@ -7,6 +7,11 @@ on:
       - main
       - master
       - dev
+  pull_request:
+    branches:
+      - main
+      - master
+      - dev
 
 permissions:
   contents: read
@@ -71,5 +76,10 @@ jobs:
       # Run test suite
       #----------------------------------------------
       - name: Run tests
+        run: |
+          poetry run pytest -v
+      - name: Run tests in debug mode
+        env:
+          PREADATOR_DEBUG: 1
         run: |
           poetry run pytest -v

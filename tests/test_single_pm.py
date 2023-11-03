@@ -64,7 +64,6 @@ def serial_execution(submit_method: str) -> None:
         log_level="INFO",
         num_processes=1,
         threads_per_process=1,
-        threads_per_request=1,
     ) as pm:
         futures = []
 
