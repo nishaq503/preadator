@@ -8,6 +8,9 @@ import os
 import queue
 import typing
 
+DEBUG = os.getenv("PREADATOR_DEBUG", "0").lower() == "1"
+LOG_LEVEL = getattr(logging, os.environ.get("PREADATOR_LOG_LEVEL", "WARNING"))
+
 
 def unit(x: typing.Any) -> typing.Any:  # noqa: ANN401
     """Returns the given argument."""
@@ -20,6 +23,10 @@ class ProcessManager(concurrent.futures.Executor):
     The ProcessManager class is a singleton class that manages processes and
     threads. It is a subclass of concurrent.futures.Executor and can be used
     as such. It is also a context manager and can be used as such.
+
+    Preadator can also log the progress of the processes and threads. This is
+    controlled by the PREADATOR_LOG_LEVEL environment variable. The default
+    logging level is WARNING.
 
     Examples:
         The `ProcessManager` is meant to be a drop-in replacement for
@@ -111,7 +118,7 @@ class ProcessManager(concurrent.futures.Executor):
         ValueError: factorial() not defined for negative values
     """
 
-    _unique_manager = None
+    _unique_manager: typing.Optional["ProcessManager"] = None
     """The unique ProcessManager instance.
 
     This is a class attribute that is used to ensure that only one instance of
@@ -119,103 +126,44 @@ class ProcessManager(concurrent.futures.Executor):
     the ProcessManager class is instantiated more than once.
     """
 
-    log_level = getattr(logging, os.environ.get("PREADATOR_LOG_LEVEL", "WARNING"))
-    """The logging level of the ProcessManager.
+    _running: bool
 
-    This is controlled by the PREADATOR_LOG_LEVEL environment variable.
-    """
+    # """The name of the current job."""
 
-    debug = os.getenv("PREADATOR_DEBUG", "0").lower() == "1"
-    """Whether to run in debug mode.
+    # """The logger of the current job."""
 
-    This is controlled by the PREADATOR_DEBUG environment variable.
+    # """The ProcessPoolExecutor instance."""
 
-    In debug mode, the ProcessManager will run all submitted jobs in the main
-    process and thread. It still returns the results using futures, as if they
-    were run in parallel, but it does not actually run them in parallel. This is
-    useful for debugging when, for example, you want to attach a debugger, or if
-    you want to find out whether a bug is caused by running code in parallel, or
-    because of dependencies between the processes/threads, or because of
-    something else.
-    """
+    # """The list of process futures."""
 
-    name = "ProcessManager"
-    """The name of the ProcessManager's main logger."""
+    # """The ThreadPoolExecutor instance."""
 
-    _main_logger = logging.getLogger(name)
-    """The main logger of the ProcessManager."""
+    # """The list of thread futures."""
 
-    _main_logger.setLevel(log_level)
+    # """The number of active threads."""
 
-    _job_name = None
-    """The name of the current job."""
+    # """The number of threads per process that can be run.
 
-    _job_logger = None
-    """The logger of the current job."""
+    # This default is set so that the product of the number of processes and the
+    # number of threads per process is equal to the number of available CPUs.
+    # """
 
-    _process_executor = None
-    """The ProcessPoolExecutor instance."""
+    # """The number of threads per request.
 
-    processes = None
-    """The list of process futures."""
+    # This is used to manage the redistribution of threads between processes.
+    # """
 
-    _thread_executor = None
-    """The ThreadPoolExecutor instance."""
+    # """The process queue."""
 
-    threads = None
-    """The list of thread futures."""
+    # """The process names queue."""
 
-    num_active_threads: int
-    """The number of active threads."""
+    # """The process IDs queue."""
 
-    num_active_threads = 0
+    # """The thread queue."""
 
-    num_available_cpus: int
-    """The number of available CPUs."""
+    # """The thread names queue."""
 
-    num_available_cpus = multiprocessing.cpu_count()
-
-    num_processes: int = max(1, num_available_cpus // 2)
-    """The maximum number of processes.
-
-    This is set to half the number of available CPUs by default. This is because
-    the number of processes is usually limited by the number of available CPUs
-    and each process can run, for example, IO-bound tasks in different threads.
-    """
-
-    threads_per_process: int = num_available_cpus // num_processes
-    """The number of threads per process that can be run.
-
-    This default is set so that the product of the number of processes and the
-    number of threads per process is equal to the number of available CPUs.
-    """
-
-    _threads_per_request: int = threads_per_process
-    """The number of threads per request.
-
-    This is used to manage the redistribution of threads between processes.
-    """
-
-    _running: bool = False
-    """Whether the ProcessManager is running."""
-
-    _process_queue = None
-    """The process queue."""
-
-    _process_names = None
-    """The process names queue."""
-
-    _process_ids = None
-    """The process IDs queue."""
-
-    _thread_queue = None
-    """The thread queue."""
-
-    _thread_names = None
-    """The thread names queue."""
-
-    _thread_ids = None
-    """The thread IDs queue."""
+    # """The thread IDs queue."""
 
     def __new__(
         cls,
@@ -231,43 +179,94 @@ class ProcessManager(concurrent.futures.Executor):
         """
         if cls._unique_manager is None:
             cls._unique_manager = super().__new__(cls)
+            cls._running: bool = False
         return cls._unique_manager
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         name: typing.Optional[str] = None,
+        log_level: typing.Optional[str] = None,
+        debug: typing.Optional[bool] = None,
+        num_processes: typing.Optional[int] = None,
         process_names: typing.Optional[list[str]] = None,
-        **kwargs,  # noqa: ANN003
+        threads_per_process: typing.Optional[int] = None,
     ) -> None:
         """Initializes the process manager.
 
         Args:
             name: The name of the ProcessManager.
+            log_level: The logging level of the ProcessManager.
+            debug: Whether to run in debug mode.
+            num_processes: The maximum number of processes.
             process_names: The names of the processes.
-            **kwargs: See below
+            threads_per_process: The number of threads per process that can be run.
 
-        Keyword Args:
-            log_level (str): The logging level of the ProcessManager.
-            num_processes (int): The maximum number of processes.
-            threads_per_process (int): The number of threads per process that can
-            be run.
+        Raises:
+            ValueError: If the number of process names is not equal to the number
+            of processes.
         """
-        # Check kwargs.
-        for k, v in kwargs.items():
-            if not hasattr(self, k):
-                msg = f"Invalid initializer argument: {k}={v}"
-                raise ValueError(msg)
-
         # Make sure that the ProcessManager is not already running.
         if self._running:
             msg = "ProcessManager is already running. Try shutting it down first."
-            self._main_logger.warning(msg)
+            self._main_logger.warning(msg)  # type: ignore[has-type]
+            return
 
         # Change the name of the logger.
-        if name is not None:
-            self.name = name
-            self._main_logger = logging.getLogger(name)
-            self._main_logger.setLevel(self.log_level)
+        self.name = "PM_main" if name is None else name
+        """The name of the ProcessManager's main logger."""
+
+        self.log_level = LOG_LEVEL if log_level is None else log_level
+
+        self._main_logger = logging.getLogger(name)
+        """The main logger of the ProcessManager."""
+
+        self._main_logger.setLevel(self.log_level)
+
+        self.debug = DEBUG if debug is None else debug
+        """Whether to run in debug mode.
+
+        This is controlled by the PREADATOR_DEBUG environment variable.
+
+        In debug mode, the ProcessManager will run all submitted jobs in the main
+        process and thread. It still returns the results using futures, as if they
+        were run in parallel, but it does not actually run them in parallel. This is
+        useful for debugging when, for example, you want to attach a debugger, or if
+        you want to find out whether a bug is caused by running code in parallel, or
+        because of dependencies between the processes/threads, or because of
+        something else.
+        """
+
+        self.num_processes = (
+            max(1, multiprocessing.cpu_count() // 2)
+            if num_processes is None
+            else num_processes
+        )
+        """The maximum number of processes.
+
+        This is set to half the number of available CPUs by default. This is because
+        the number of processes is usually limited by the number of available CPUs
+        and each process can run, for example, IO-bound tasks in different threads.
+        """
+
+        self.threads_per_process = (
+            2 if threads_per_process is None else threads_per_process
+        )
+        """The number of threads per process that can be run.
+
+        This default is set so that the product of the number of processes and the
+        number of threads per process is equal to the number of available CPUs.
+        """
+
+        self._threads_per_request = self.threads_per_process
+
+        self.num_available_cpus = min(
+            self.num_processes * self.threads_per_process,
+            multiprocessing.cpu_count(),
+        )
+        """The number of available CPUs."""
+
+        self.num_active_threads = 0
+        """The number of active threads."""
 
         # Start the Process Manager.
         self._running = True
@@ -284,29 +283,29 @@ class ProcessManager(concurrent.futures.Executor):
             msg = f"Number of process names must be equal to {self.num_processes}."
             raise ValueError(msg)
 
-        self._process_names = multiprocessing.Queue(self.num_processes)
+        self._process_names = multiprocessing.Queue(self.num_processes)  # type: ignore
         for p_name in process_names:
-            self._process_names.put(p_name)  # type: ignore[attr-defined]
+            self._process_names.put(p_name)
 
         # Create the process queue and populate it.
-        self._process_queue = multiprocessing.Queue(self.num_processes)
+        self._process_queue = multiprocessing.Queue(self.num_processes)  # type: ignore
         for _ in range(self.num_processes):
-            self._process_queue.put(self.threads_per_process)  # type: ignore[attr-defined]  # noqa: E501
+            self._process_queue.put(self.threads_per_process)
 
         # Create the process IDs queue.
-        self._process_ids = multiprocessing.Queue()
+        self._process_ids = multiprocessing.Queue()  # type: ignore
 
         # Create the process executor.
         self._process_executor = concurrent.futures.ProcessPoolExecutor(
             max_workers=self.num_processes,
         )
-        self.processes = []  # type: ignore[var-annotated]
+        self.processes = []  # type: ignore
 
         # Create the thread executor.
         self._thread_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=self.num_available_cpus,
         )
-        self.threads = []  # type: ignore[var-annotated]
+        self.threads = []  # type: ignore
 
         if self._running:
             num_threads = self.threads_per_process
@@ -316,37 +315,27 @@ class ProcessManager(concurrent.futures.Executor):
         self._main_logger.debug(
             f"Starting the thread pool with {num_threads} threads ...",
         )
-        self._thread_queue = multiprocessing.Queue(num_threads)
+        self._thread_queue = multiprocessing.Queue(num_threads)  # type: ignore
         for _ in range(0, num_threads, self._threads_per_request):
-            self._thread_queue.put(self._threads_per_request)  # type: ignore[attr-defined]  # noqa: E501
+            self._thread_queue.put(self._threads_per_request)
         self.num_active_threads = num_threads
 
-        self._initializer(**kwargs)
+    # def _initializer(
+    #     self,
+    #     **init_args,
+    # ) -> None:
+    #     # Initialize the process.
+    #     for k, v in init_args.items():
 
-    def _initializer(
-        self,
-        **init_args,  # noqa: ANN003
-    ) -> None:
-        # Initialize the process.
-        for k, v in init_args.items():
-            setattr(self, k, v)
-
-        self._job_name = self._process_names.get(timeout=0)  # type: ignore[attr-defined]  # noqa: E501
-        self._job_logger = logging.getLogger(self._job_name)
-        self._job_logger.setLevel(self.log_level)
-
-        self._process_ids.put(os.getpid())  # type: ignore[attr-defined]
-        self._main_logger.debug(
-            f"Process {self._job_name} initialized with PID {os.getpid()}.",
-        )
+    #     self._main_logger.debug(
 
     def acquire_process(self) -> "ProcessLock":
         """Acquires a lock for the current process."""
-        return ProcessLock(self._process_queue)  # type: ignore[arg-type]
+        return ProcessLock(self._process_queue, self)
 
     def acquire_thread(self) -> "ThreadLock":
         """Acquires a lock for the current thread."""
-        return ThreadLock(self._thread_queue)  # type: ignore[arg-type]
+        return ThreadLock(self._thread_queue, self)
 
     def submit_process(
         self,
@@ -365,11 +354,11 @@ class ProcessManager(concurrent.futures.Executor):
         """
         if self.debug:
             result = fn(*args, **kwargs)
-            f = self._process_executor.submit(unit, result)  # type: ignore[union-attr]
+            f = self._process_executor.submit(unit, result)
         else:
-            f = self._process_executor.submit(fn, *args, **kwargs)  # type: ignore[union-attr]  # noqa: E501
+            f = self._process_executor.submit(fn, *args, **kwargs)
 
-        self.processes.append(f)  # type: ignore[union-attr]
+        self.processes.append(f)
         return f
 
     def submit_thread(
@@ -389,10 +378,10 @@ class ProcessManager(concurrent.futures.Executor):
         """
         if self.debug:
             result = fn(*args, **kwargs)
-            f = self._thread_executor.submit(unit, result)  # type: ignore[union-attr]
+            f = self._thread_executor.submit(unit, result)
         else:
-            f = self._thread_executor.submit(fn, *args, **kwargs)  # type: ignore[union-attr]  # noqa: E501
-        self.threads.append(f)  # type: ignore[union-attr]
+            f = self._thread_executor.submit(fn, *args, **kwargs)
+        self.threads.append(f)
         return f
 
     def submit(
@@ -429,8 +418,8 @@ class ProcessManager(concurrent.futures.Executor):
 
             for p in done:
                 if (e := p.exception(timeout=0)) is not None:
-                    self._process_executor.shutdown(cancel_futures=True)  # type: ignore[union-attr]  # noqa: E501
-                    self._job_logger.error(e)  # type: ignore[union-attr]
+                    self._process_executor.shutdown(cancel_futures=True)
+                    self._main_logger.error(e)
                     errors.append(e)
 
             progress = 100 * len(done) / (len(done) + len(not_done))
@@ -475,8 +464,8 @@ class ProcessManager(concurrent.futures.Executor):
 
             for t in done:
                 if (e := t.exception(timeout=0)) is not None:
-                    self._thread_executor.shutdown(cancel_futures=True)  # type: ignore[union-attr]  # noqa: E501
-                    self._job_logger.error(e)  # type: ignore[union-attr]
+                    self._thread_executor.shutdown(cancel_futures=True)
+                    self._main_logger.error(e)
                     errors.append(e)
 
             progress = 100 * len(done) / (len(done) + len(not_done))
@@ -563,11 +552,11 @@ class ProcessManager(concurrent.futures.Executor):
         self._thread_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=self.num_available_cpus,
         )
-        self.threads = []  # type: ignore[var-annotated]
+        self.threads = []
         self._process_executor = concurrent.futures.ProcessPoolExecutor(
             max_workers=self.num_processes,
         )
-        self.processes = []  # type: ignore[var-annotated]
+        self.processes = []
 
         if len(errors) > 0:
             msg = (
@@ -581,25 +570,34 @@ class ProcessManager(concurrent.futures.Executor):
 class QueueLock(abc.ABC):
     """An abstract class for dealing with locks in processes and threads."""
 
-    name = "QueueLock"
-    """The name of the lock's logger."""
-
-    logger = logging.getLogger(name)
-    """The logger of the lock."""
-
-    logger.setLevel(ProcessManager.log_level)
-
-    def __init__(self, queue: multiprocessing.Queue) -> None:
+    def __init__(
+        self,
+        queue: multiprocessing.Queue,
+        pm: ProcessManager,
+    ) -> None:
         """Initializes the lock with the queue.
 
         Args:
             queue: The queue to use for locking.
+            pm: The ProcessManager instance.
         """
         self.queue = queue
         """The queue to use for locking."""
 
         self.count = 0
         """The number of locks to acquire."""
+
+        self.name = "QueueLock"
+        """The name of the lock's logger."""
+
+        self.logger = logging.getLogger(self.name)
+        """The logger of the lock."""
+
+        self.logger.setLevel(pm.log_level)
+
+        self._thread_queue = pm._thread_queue
+        self.threads_per_process = pm.threads_per_process
+        self._threads_per_request = pm._threads_per_request
 
     def lock(self) -> None:
         """Acquires the lock in the queue."""
@@ -633,14 +631,6 @@ class QueueLock(abc.ABC):
 class ThreadLock(QueueLock):
     """A lock for threads."""
 
-    name = "ThreadLock"
-    """The name of the lock's logger."""
-
-    logger = logging.getLogger(name)
-    """The logger of the lock."""
-
-    logger.setLevel(ProcessManager.log_level)
-
     def release(self) -> None:
         """Releases the lock in the queue."""
         self.logger.debug(f"Releasing {self.count} locks ...")
@@ -650,14 +640,6 @@ class ThreadLock(QueueLock):
 class ProcessLock(QueueLock):
     """A lock for processes."""
 
-    name = "ProcessLock"
-    """The name of the lock's logger."""
-
-    logger = logging.getLogger(name)
-    """The logger of the lock."""
-
-    logger.setLevel(ProcessManager.log_level)
-
     def release(self) -> None:
         """Releases the lock in the queue."""
         # We may have stolen some threads from other processes, so we need to
@@ -665,24 +647,12 @@ class ProcessLock(QueueLock):
         try:
             num_returned = 0
             while True:
-                num_returned += ProcessManager._thread_queue.get(  # type: ignore[attr-defined]  # noqa: E501
-                    timeout=0,
-                )
+                num_returned += self._thread_queue.get(timeout=0)
 
         except queue.Empty:
             self.logger.debug(f"Returning {num_returned} threads to the queue ...")
-            for _ in range(
-                0,
-                num_returned,
-                ProcessManager.threads_per_process,
-            ):
-                self.queue.put(
-                    ProcessManager.threads_per_process,
-                    timeout=0,
-                )
+            for _ in range(0, num_returned, self.threads_per_process):
+                self.queue.put(self.threads_per_process, timeout=0)
 
-            ProcessManager.num_active_threads = ProcessManager.threads_per_process
-            ProcessManager._thread_queue.put(  # type: ignore[attr-defined]
-                ProcessManager._threads_per_request,
-            )
+            self._thread_queue.put(self._threads_per_request)
             self.logger.debug(f"Returned {num_returned} threads to the queue.")

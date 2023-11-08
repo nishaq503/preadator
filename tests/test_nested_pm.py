@@ -120,6 +120,7 @@ def img_op(
     return o
 
 
+@pytest.mark.skip(reason="We removed nested ProcessManagers.")
 def test_nested_pm() -> None:
     """Test that preadator's ProcessManager can be nested."""
     data_dir = pathlib.Path(tempfile.mkdtemp(suffix="_data_dir"))
