@@ -120,7 +120,7 @@ def img_op(
     return o
 
 
-@pytest.mark.skip(reason="We removed nested ProcessManagers.")
+@pytest.mark.skipif("not config.getoption('hangs')")
 def test_nested_pm() -> None:
     """Test that preadator's ProcessManager can be nested."""
     data_dir = pathlib.Path(tempfile.mkdtemp(suffix="_data_dir"))
@@ -225,6 +225,7 @@ def fibonacci(n: int, method: typing.Literal["process", "thread"]) -> int:
         return f_1.result() + f_2.result()
 
 
+@pytest.mark.skipif("not config.getoption('hangs')")
 @pytest.mark.parametrize("n", [3, 4, 5, 6])
 @pytest.mark.parametrize("method", ["process", "thread"])
 def test_fibonacci(n: int, method: typing.Literal["process", "thread"]) -> None:
