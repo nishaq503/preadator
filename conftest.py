@@ -10,7 +10,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         dest="hangs",
         default=False,
-        help="run hangs tests",
+        help="run hanging tests",
     )
     parser.addoption(
         "--slow",
@@ -24,7 +24,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         dest="downloads",
         default=False,
-        help="downloads large data files",
+        help="run tests that download large data files",
     )
     parser.addoption(
         "--all",
