@@ -127,43 +127,12 @@ class ProcessManager(concurrent.futures.Executor):
     """
 
     _running: bool
+    """Whether the ProcessManager is running.
 
-    # """The name of the current job."""
-
-    # """The logger of the current job."""
-
-    # """The ProcessPoolExecutor instance."""
-
-    # """The list of process futures."""
-
-    # """The ThreadPoolExecutor instance."""
-
-    # """The list of thread futures."""
-
-    # """The number of active threads."""
-
-    # """The number of threads per process that can be run.
-
-    # This default is set so that the product of the number of processes and the
-    # number of threads per process is equal to the number of available CPUs.
-    # """
-
-    # """The number of threads per request.
-
-    # This is used to manage the redistribution of threads between processes.
-    # """
-
-    # """The process queue."""
-
-    # """The process names queue."""
-
-    # """The process IDs queue."""
-
-    # """The thread queue."""
-
-    # """The thread names queue."""
-
-    # """The thread IDs queue."""
+    This is a class attribute that is used to ensure that the ProcessManager
+    is not started more than once and so that we can nest the submission of
+    threads.
+    """
 
     def __new__(
         cls,

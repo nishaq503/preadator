@@ -202,7 +202,34 @@ def test_nested_pm() -> None:
 
 
 def fibonacci(n: int, method: typing.Literal["process", "thread"]) -> int:
-    """Get Fibonacci number, the recursive way."""
+    """Get Fibonacci number, the recursive way.
+
+    For now, his test should fail with a large enough n. The reason is that the
+    ProcessManager will have too many threads/processes to manage and will
+    hang.
+
+    With small n, the test will pass if there are enough threads/processes
+    available.
+
+    With large n, the test will fail because there are not enough
+    threads/processes available for the shortest possible execution path to a
+    base case.
+
+    With moderate n, the test will have a chance of passing or failing depending
+    on the number of threads/processes available and on the inherent randomness
+    of the execution order of the threads/processes.
+
+    Eventually, we will rework how the ProcessManager handles nested
+    thread/process submissions. At that point, this test should pass for all
+    values of n if there is enough time to run the test.
+
+    Args:
+        n: the nth Fibonacci number to get.
+        method: use threads or processes.
+
+    Returns:
+        the nth Fibonacci number.
+    """
     if n < 0:
         msg = "fibonacci() not defined for negative values"
         raise ValueError(msg)
